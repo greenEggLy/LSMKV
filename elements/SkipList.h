@@ -22,7 +22,7 @@ class KVNode {
   [[nodiscard]] uint64_t getKey() const { return key; }
   [[nodiscard]] std::string getValue() const { return value; }
   void setKey(uint64_t k) { key = k; }
-  void setValue(std::string v) { value = std::move(v); }
+  void setValue(const std::string &v) { value = v; }
  private:
   uint64_t key{};
   std::string value;
@@ -51,7 +51,7 @@ class QuadNode {
 
   void setGuarder(bool g = true) { guarder = g; }
   [[nodiscard]] bool isGuarder() const { return guarder; }
-  void setValue(std::string v) { node.setValue(std::move(v)); }
+  void setValue(const std::string &v) { node.setValue(v); }
   [[nodiscard]] uint64_t getKey() const { return node.getKey(); }
   [[nodiscard]] std::string getValue() const { return node.getValue(); }
   [[nodiscard]] int getLevel() const { return level; }
@@ -80,10 +80,11 @@ class SkipList {
  public:
   explicit SkipList(int maxHeight = 48, double p = 0.5);
   ~SkipList();
-  bool PUT(uint64_t key, const std::string &value);
+  bool PUT(uint64_t key, const std::string &value, bool is_first_find);
   std::string GET(uint64_t key);
   bool DEL(uint64_t key);
   QuadNodeList *getAllNodes();
+  QuadNode *scan_util(uint64_t key);
   [[nodiscard]] uint64_t getLargestKey() const { return lKey; }
   [[nodiscard]] uint64_t getSmallestKey() const { return sKey; }
   [[nodiscard]] uint64_t getKVNumber() const { return dataSize; }

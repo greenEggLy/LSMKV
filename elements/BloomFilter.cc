@@ -22,7 +22,7 @@ bool BloomFilter::search(const uint64_t &key) {
 	unsigned int hash[4] = {0};
 	MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
 	for (auto i : hash) {
-		if (filter[i % size_] == 0) return false;
+		if (!this->filter[i % size_]) return false;
 	}
 	return true;
 }

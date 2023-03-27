@@ -16,19 +16,18 @@
 #include "BloomFilter.h"
 #include "SkipList.h"
 
-class Header {
- public:
-  Header(uint64_t time, uint64_t kvNumber, uint64_t largest, uint64_t smallest);
-  uint64_t timeStamp;
-  uint64_t kvNumber;
-  uint64_t lKey, sKey;
-};
+typedef std::pair<int64_t, unsigned int> index_t;
 
-class Indexer {
+class BuffTable {
  public:
-  Indexer() = default;
-  inline void addPair(uint64_t key, unsigned int offset) { content_.emplace_back(std::make_pair(key, offset)); }
-  std::vector<std::pair<uint64_t, unsigned int>> content_;
+  BuffTable() = default;
+  BuffTable(uint64_t time_stamp, uint64_t kvNum, uint64_t largest, uint64_t smallest);
+  uint64_t timeStamp{};
+  uint64_t kvNumber{};
+  uint64_t lKey{}, sKey{};
+  BloomFilter filter_;
+  std::vector<index_t> indexer;
+  inline void addIndex(uint64_t key, unsigned int offset) { indexer.emplace_back(std::make_pair(key, offset)); }
 };
 
 class DataZone {
@@ -40,22 +39,18 @@ class DataZone {
 
 class SSTable {
  public:
+  static uint64_t TIMESTAMP;
   SSTable();
   ~SSTable();
   void handle(SkipList *skip_list, std::string &dir);
-  void createTable(SkipList *skip_list);
-  void dumpInfo(std::string &dir);
-  Header *getHead() const { return header_; }
-  BloomFilter *getFilter() const { return bloom_filter_; }
-  Indexer *getIndexer() const { return indexer_; }
+  void create_table(SkipList *skip_list);
+  void dump_info(std::string &dir);
+  BuffTable *get_buff_table() const { return buff_table_; }
 
  private:
-  Header *header_;
-  BloomFilter *bloom_filter_;
-  Indexer *indexer_;
+  BuffTable *buff_table_;
   DataZone *data_zone_;
 
-  static uint64_t timeStamp;
   unsigned int offSet;
 
 };

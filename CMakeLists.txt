@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.21)
 project(LSMKV)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 add_executable(
         LSMKV
-        #                main.c
+        #        main.cpp
         correctness.cc
         #        persistence.cc
         kvstore_api.h kvstore.h kvstore.cc

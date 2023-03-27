@@ -1,14 +1,15 @@
 #include <iostream>
 #include <cstdint>
 #include <string>
+#include <chrono>
 
 #include "test.h"
 
 class CorrectnessTest : public Test {
  private:
   const uint64_t SIMPLE_TEST_MAX = 512;
-//  const uint64_t LARGE_TEST_MAX = 1024 * 64;
-  const uint64_t LARGE_TEST_MAX = 1024 * 12;
+  const uint64_t LARGE_TEST_MAX = 1024 * 64;
+//  const uint64_t LARGE_TEST_MAX = 1024 * 12;
 
   void regular_test(uint64_t max) {
 	  uint64_t i;
@@ -36,6 +37,7 @@ class CorrectnessTest : public Test {
 	  phase();
 
 	  // Test scan
+
 	  std::list<std::pair<uint64_t, std::string> > list_ans;
 	  std::list<std::pair<uint64_t, std::string> > list_stu;
 
@@ -64,6 +66,7 @@ class CorrectnessTest : public Test {
 	  phase();
 
 	  // Test deletions
+
 	  for (i = 0; i < max; i += 2)
 		  EXPECT(true, store.del(i));
 
@@ -109,7 +112,12 @@ int main(int argc, char *argv[]) {
 
 	CorrectnessTest test("./data", verbose);
 
+	auto start = std::chrono::system_clock::now();
+
 	test.start_test();
 
+	auto end = std::chrono::system_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+	std::cout << "\n cost: " << (double) (duration.count()) << "\n";
 	return 0;
 }
