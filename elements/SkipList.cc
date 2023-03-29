@@ -65,7 +65,7 @@ SkipList::~SkipList() {
 
 /// PUT a node, if it success, return true
 
-bool SkipList::PUT(uint64_t key, const std::string &value, bool is_first_find) {
+bool SkipList::PUT(uint64_t key, const std::string &value, bool for_del) {
 	QuadNode *quad_node = searchUtil(key);
 	quad_node->toLevel(quad_node->getLevel(), 0);
 	if (quad_node == vector_[0].end()) {
@@ -85,7 +85,7 @@ bool SkipList::PUT(uint64_t key, const std::string &value, bool is_first_find) {
 		return true;
 	}
 	// if the key to be deleted not found, return false;
-	if (is_first_find && (quad_node->getKey() != key || quad_node->isGuarder()) && value == D_FLAG) return false;
+	if (for_del && (quad_node->getKey() != key || quad_node->isGuarder()) && value == D_FLAG) return false;
 	// judge whether a new node can be inserted
 	if (willOverFlow(value, "")) return false;
 	// insert a new node, update key info
@@ -128,11 +128,8 @@ bool SkipList::DEL(uint64_t key) {
 }
 
 bool SkipList::willOverFlow(const std::string &value, const std::string &oldValue) {
-//	if (oldValue == D_FLAG) {
-//		std::cout << "new value: " << value << "\n";
-//	}
 	byteSize += value.size() - oldValue.size(); // replace old value
-	byteSize += oldValue.empty() ? 8 : 0; // whether to insert a new key
+	byteSize += oldValue.empty() ? 12 : 0; // whether to insert a new key
 	if (byteSize > overFlowSize) return true;
 	return false;
 }

@@ -1,16 +1,25 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.14)
+
 project(LSMKV)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 14)
 
-add_executable(
-        LSMKV
-        #        main.cpp
+include_directories(include)
+
+add_executable(correctness
         correctness.cc
         #        persistence.cc
-        kvstore_api.h kvstore.h kvstore.cc
-        MurmurHash3.h
-        elements/SkipList.h elements/SSTable.cc
-        elements/SSTable.h elements/BloomFilter.h
-        utils.h
-        elements/SkipList.cc elements/BloomFilter.cc)
+        kvstore.cc
+        elements/SSTable.cc
+        elements/SkipList.cc elements/BloomFilter.cc global.cpp)
+add_executable(persistence
+        persistence.cc
+        kvstore.cc
+        elements/SSTable.cc
+        elements/SkipList.cc elements/BloomFilter.cc global.cpp)
+add_executable(main
+        main.cpp
+        #        persistence.cc
+        kvstore.cc
+        elements/SSTable.cc
+        elements/SkipList.cc elements/BloomFilter.cc global.cpp)

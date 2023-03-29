@@ -13,7 +13,7 @@
 #include <iostream>
 #include <stdexcept>
 
-const uint64_t overFlowSize = 2097152;
+const uint64_t overFlowSize = 2 * 1024 * 1024;
 const std::string D_FLAG = "~DELETED~";
 
 class KVNode {
@@ -80,7 +80,7 @@ class SkipList {
  public:
   explicit SkipList(int maxHeight = 48, double p = 0.5);
   ~SkipList();
-  bool PUT(uint64_t key, const std::string &value, bool is_first_find);
+  bool PUT(uint64_t key, const std::string &value, bool for_del);
   std::string GET(uint64_t key);
   bool DEL(uint64_t key);
   QuadNodeList *getAllNodes();

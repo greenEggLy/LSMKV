@@ -2,13 +2,14 @@
 //#include "SkipList.h"
 #include <iostream>
 #include "kvstore.h"
+#include "global.h"
 
 using namespace std;
 
 int main() {
-	auto *store = new KVStore("aaa");
-	store->delete_files();
+//	auto *store = new KVStore("aaa");
+//	store->delete_files();
 
-	delete store;
+//	delete store;
 	return 0;
 }

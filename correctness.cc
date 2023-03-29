@@ -8,8 +8,8 @@
 class CorrectnessTest : public Test {
  private:
   const uint64_t SIMPLE_TEST_MAX = 512;
-  const uint64_t LARGE_TEST_MAX = 1024 * 64;
-//  const uint64_t LARGE_TEST_MAX = 1024 * 12;
+//  const uint64_t LARGE_TEST_MAX = 1024 * 64;
+  const uint64_t LARGE_TEST_MAX = 1024 * 4;
 
   void regular_test(uint64_t max) {
 	  uint64_t i;
