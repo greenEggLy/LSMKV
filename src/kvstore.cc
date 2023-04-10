@@ -1,7 +1,6 @@
 #include "kvstore.h"
 #include <string>
 #include <cstdint>
-#include <cassert>
 KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir) {
 	list_ = nullptr;
 	table_ = nullptr;
@@ -62,14 +61,9 @@ std::string KVStore::pri_get(uint64_t key, bool &deleted) {
 			}
 		}
 	}
-	if (key == 0) {
-//		std::cout << res_timestamp << " " << ret << "\n";
-	}
 	if (ret == D_FLAG) {
 		ret = "";
 		deleted = true;
-	} else if (!(key & 1) && !key) {
-//		std::cout << res_timestamp << " ";
 	}
 	return ret;
 }
@@ -330,7 +324,6 @@ void KVStore::read_config() {
 		iss.clear();
 		iss.str(info);
 		iss >> level >> num >> mode;
-//		printf("info: %zd %zd %s\n", level, num, mode.c_str());
 		if (mode == "Tiering") m = TIERING;
 		else m = LEVELING;
 		config_[level] = std::make_pair(num, m);
@@ -469,7 +462,6 @@ void KVStore::read_meta() {
 //					buff_table.filter.filter[i * 64 + 64 - j - 1] = res & 1;
 //					res = res >> 1;
 				}
-//				buff_table.filter.read_meta(res, i * 64);
 			}
 			for (uint64_t i = 0; i < buff_table.kvNumber; ++i) {
 				f.read((char *) &res, 8);
