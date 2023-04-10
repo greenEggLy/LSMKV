@@ -1,18 +1,18 @@
-#include "include/kvstore.h"
+#include "kvstore.h"
 #include <string>
 #include <cstdint>
+#include <cassert>
 KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir) {
 	list_ = nullptr;
 	table_ = nullptr;
 	read_config();
-	read_local();
+	read_meta();
 }
 
 KVStore::~KVStore() {
 	if (list_) {
-		auto level = all_buffs.size();
-		dump(level - 1, TIME_STAMP);
-		compaction(level - 1, level);
+		dump(TIME_STAMP);
+		compaction(0, 1);
 	}
 	delete table_;
 	table_ = nullptr;
@@ -27,8 +27,8 @@ void KVStore::put(uint64_t key, const std::string &s) {
 		list_ = new SkipList;
 	}
 	if (!(list_->PUT(key, s, false))) {
-		dump(0, 0);
-		// if overflow, then compaction
+		dump(0);
+		// if overflowed, then compaction
 		compaction(0, 1);
 		// insert again
 		list_ = new SkipList;
@@ -45,21 +45,31 @@ std::string KVStore::get(uint64_t key) {
 	return pri_get(key, deleted);
 }
 std::string KVStore::pri_get(uint64_t key, bool &deleted) {
-	std::string ret;
+	std::string ret, tmp_val;
+	uint64_t res_timestamp = 0;
 	if (list_) ret = list_->GET(key);
-	if (ret.empty() && TIME_STAMP > 1) {
+	if (ret.empty()) {
 		for (const auto &level_info : all_buffs) {
 			for (const auto &tg_pair : level_info.second) {
-				if (tg_pair.second.lKey < key || tg_pair.second.sKey > key) continue;
-				ret = get_util(key, level_info.first, tg_pair.first.first, tg_pair.first.second, tg_pair.second);
-				if (!ret.empty()) break;
+				auto b_table = tg_pair.second;
+				if (b_table.lKey < key || b_table.sKey > key || res_timestamp >= tg_pair.first.first)
+					continue;
+				tmp_val = get_util(key, level_info.first, tg_pair.first.first, tg_pair.first.second, tg_pair.second);
+				if (!tmp_val.empty()) {
+					ret = tmp_val;
+					res_timestamp = tg_pair.first.first;
+				}
 			}
-			if (!ret.empty()) break;
 		}
+	}
+	if (key == 0) {
+//		std::cout << res_timestamp << " " << ret << "\n";
 	}
 	if (ret == D_FLAG) {
 		ret = "";
 		deleted = true;
+	} else if (!(key & 1) && !key) {
+//		std::cout << res_timestamp << " ";
 	}
 	return ret;
 }
@@ -88,9 +98,9 @@ bool KVStore::del(uint64_t key) {
  */
 void KVStore::reset() {
 	std::vector<std::string> dir_names;
-	utils::scanDir(data_path, dir_names);
+	utils::scanDir(DATA_PATH, dir_names);
 	for (const auto &dir : dir_names) {
-		std::string dir_path = data_path + dir;
+		std::string dir_path = DATA_PATH + dir;
 		std::vector<std::string> file_names;
 		utils::scanDir(dir_path, file_names);
 		for (const auto &file : file_names) {
@@ -142,7 +152,7 @@ void KVStore::scan(uint64_t key1, uint64_t key2, std::list<std::pair<uint64_t, s
 					unsigned int res, next;
 					if (search_index(curKey, buff_table.indexer, res, next)) {
 						auto value =
-							read_from_file(level_info.first, tg_pair.first.first, tg_pair.first.second, res, next);
+							read_data(level_info.first, tg_pair.first.first, tg_pair.first.second, res, next);
 						if (!value.empty()) res_map[curKey] = value;
 					}
 				}
@@ -167,7 +177,7 @@ std::string KVStore::get_util(uint64_t key,
 		// may have, search in Indexer
 		unsigned int res, next;
 		if (search_index(key, buff_table.indexer, res, next)) { // if the key exists, read from filed
-			return read_from_file(level, time_stamp, tag, res, next);
+			return read_data(level, time_stamp, tag, res, next);
 		}
 	}
 	return "";
@@ -179,21 +189,31 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
 	std::string dirX = get_dir_name(level_x);
 	std::string dirY = get_dir_name(level_y);
 	std::vector<std::pair<uint64_t, uint64_t>> tar_x, tar_y;
-	std::map<uint64_t, std::map<uint64_t, std::map<uint64_t, char>>> tar;
+	std::map<uint64_t, std::map<uint64_t, uint64_t>> tar_all;
 	std::map<uint64_t, std::string> data_map;
 	uint64_t new_time_stamp = 0;
 
 	if (!utils::dirExists(dirY)) create_folder(level_y);
-	select_files(tar_x, tar_y, tar, level_x, level_y, file_num);
-	if (!tar_y.empty()) new_time_stamp = tar_y.back().first;
-	else new_time_stamp = tar_x.back().first;
+
+	select_files(tar_x, tar_y, level_x, level_y, file_num);
+	// get new timestamp through tars
+
+	for (auto tg_pair : tar_x) {
+		new_time_stamp = std::max(new_time_stamp, tg_pair.first);
+		tar_all[tg_pair.first][tg_pair.second] = level_x;
+	}
+	for (auto tg_pair : tar_y) {
+		new_time_stamp = std::max(new_time_stamp, tg_pair.first);
+		tar_all[tg_pair.first][tg_pair.second] = level_y;
+	}
+
 	// read to data_map
-	for (const auto &tg_pair : tar_x) {
-		get_selected_sst(level_x, tg_pair.first, tg_pair.second, data_map);
+	for (const auto &tgl_pair : tar_all) {
+		for (const auto &gl_pair : tgl_pair.second) {
+			get_selected_sst(gl_pair.second, tgl_pair.first, gl_pair.first, data_map);
+		}
 	}
-	for (const auto &tg_pair : tar_y) {
-		get_selected_sst(level_y, tg_pair.first, tg_pair.second, data_map);
-	}
+
 	// delete old files
 	for (const auto &tg_pair : tar_x) {
 		delete_old_info(level_x, tg_pair.first, tg_pair.second);
@@ -214,24 +234,24 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
 		}
 		tmp_map[key] = value;
 		off_set += 12 + value.size();
-
 	}
-	if (!tmp_map.empty()) map_dump(level_y, new_time_stamp, tmp_map);
+	if (!tmp_map.empty()) {
+		map_dump(level_y, new_time_stamp, tmp_map);
+		tmp_map.clear();
+	}
 	compaction(level_y, level_y + 1);
 }
 
 void KVStore::select_files(std::vector<std::pair<uint64_t, uint64_t>> &tar_x,
 						   std::vector<std::pair<uint64_t, uint64_t>> &tar_y,
-						   std::map<uint64_t, std::map<uint64_t, std::map<uint64_t, char>>> &tar,
 						   uint64_t level_x,
 						   uint64_t level_y,
 						   uint64_t file_num) {
-	std::string path = PATH_PREFIX;
 	std::vector<std::string> files_x, files_y; // listed files in dir
 	std::map<uint64_t, std::map<uint64_t, uint64_t>> time_key_sorts;
 	std::map<uint64_t, std::map<uint64_t, char>> time_tag_sorts;
 	// level_x
-	utils::scanDir(path + std::to_string(level_x), files_x);
+	utils::scanDir(PATH_PREFIX + std::to_string(level_x), files_x);
 	bool is_leveling = false;
 	if (all_buffs.find(level_x) != all_buffs.end() && config_[level_x].second == KVStore::LEVELING) is_leveling = true;
 	for (const auto &file : files_x) {
@@ -257,7 +277,7 @@ void KVStore::select_files(std::vector<std::pair<uint64_t, uint64_t>> &tar_x,
 	}
 	// level_y
 	if (all_buffs.find(level_y) != all_buffs.end()) {
-		utils::scanDir(path + std::to_string(level_y), files_y);
+		utils::scanDir(PATH_PREFIX + std::to_string(level_y), files_y);
 		if (config_[level_y].second == KVStore::LEVELING) {
 			uint64_t sKey = UINT64_MAX, lKey = 0, ssKey, llKey;
 			std::string tmp;
@@ -278,12 +298,6 @@ void KVStore::select_files(std::vector<std::pair<uint64_t, uint64_t>> &tar_x,
 			}
 		}
 	}
-	for (const auto &tg_pair : tar_x) {
-		tar[level_x][tg_pair.first][tg_pair.second] = ' ';
-	}
-	for (const auto &tg_pair : tar_y) {
-		tar[level_y][tg_pair.first][tg_pair.second] = ' ';
-	}
 }
 void KVStore::get_selected_sst(uint64_t level,
 							   uint64_t time_stamp,
@@ -294,13 +308,12 @@ void KVStore::get_selected_sst(uint64_t level,
 	auto i_size = indexer.size();
 	for (uint64_t i = 0; i < i_size; ++i) {
 		auto &index = indexer[i];
-//		printf("index: %llu, %u\n", index.first, index.second);
 		std::string res;
 		// if is the last one
 		if (i == indexer.size() - 1) {
-			res = read_from_file(level, time_stamp, tag, index.second, -1);
+			res = read_data(level, time_stamp, tag, index.second, -1);
 		} else {
-			res = read_from_file(level, time_stamp, tag, index.second, indexer[i + 1].second);
+			res = read_data(level, time_stamp, tag, index.second, indexer[i + 1].second);
 		}
 		data_map[index.first] = res;
 	}
@@ -325,11 +338,11 @@ void KVStore::read_config() {
 	config.close();
 }
 
-std::string KVStore::read_from_file(uint64_t level,
-									uint64_t time_stamp,
-									uint64_t tag,
-									unsigned int offset,
-									unsigned int next_offset) {
+std::string KVStore::read_data(uint64_t level,
+							   uint64_t time_stamp,
+							   uint64_t tag,
+							   unsigned int offset,
+							   unsigned int next_offset) {
 	std::string file = get_file_name(level, time_stamp, tag);
 	std::fstream f;
 	f.open(file, std::ios_base::binary | std::ios_base::in);
@@ -347,6 +360,7 @@ std::string KVStore::read_from_file(uint64_t level,
 	res[len] = '\0';
 	std::string ret = res;
 	f.close();
+	delete[]res;
 	return ret;
 }
 
@@ -363,25 +377,23 @@ bool KVStore::search_index(uint64_t key, const std::vector<index_t> &indexer, un
 			if (middle + 1 < content.size())
 				next = content.at(middle + 1).second;
 			else
-				next = std::make_pair(0, -1).second;
+				next = -1;
 			return true;
 		}
 	}
 	return false;
 }
 
-void KVStore::dump(uint64_t tar_level, uint64_t time_stamp) {
-	if (!utils::dirExists(get_dir_name(tar_level))) create_folder(tar_level);
-	table_ = new SSTable;
-	table_->handle_init(list_, time_stamp);
+void KVStore::dump(uint64_t time_stamp) {
+	if (!utils::dirExists(get_dir_name(0))) create_folder(0);
+	SSTable ss_table;
+	ss_table.handle_init(list_, time_stamp);
 	// prepare file_name
-	auto file_name = get_file_name(tar_level, time_stamp, TAG);
-	dump_info(file_name, table_->get_buff_table(), table_->get_data_zone());
-	all_buffs[tar_level][{time_stamp, TAG++}] = *table_->get_buff_table();
+	auto file_name = get_file_name(0, time_stamp, TAG);
+	dump_info(file_name, ss_table.buff_table_, ss_table.data_zone_);
+	all_buffs[0][{time_stamp, TAG++}] = ss_table.buff_table_;
 	// delete skip list and ss_table
 	delete list_;
-	delete table_;
-	table_ = nullptr;
 	list_ = nullptr;
 }
 
@@ -402,42 +414,72 @@ void KVStore::delete_old_info(uint64_t level, uint64_t time_stamp, uint64_t tag)
 	all_buffs[level].erase({time_stamp, tag});
 }
 
-void KVStore::map_dump(uint64_t tar_level, uint64_t time_stamp, std::map<uint64_t, std::string> &data_map) {
-	auto *buff_table =
-		new BuffTable(time_stamp,
-					  data_map.size(),
-					  (--data_map.end())->first,
-					  data_map.begin()->first
-		);
+void KVStore::map_dump(uint64_t tar_level, uint64_t time_stamp, const std::map<uint64_t, std::string> &data_map) {
+	BuffTable buff_table(time_stamp,
+						 data_map.size(),
+						 data_map.crbegin()->first,
+						 data_map.begin()->first
+	);
+//	if (buff_table.sKey <= 0 && buff_table.lKey >= 0) std::cout << "compaction: " << time_stamp << "\n";
+	DataZone data_zone;
 	auto offSet = HEADER_BYTE_SIZE + data_map.size() * 12; // update offset
-	auto *data_zone = new DataZone;
 	uint64_t key = 0;
 	for (const auto &kv_pair : data_map) {
 		key = kv_pair.first;
-		buff_table->filter.insert(key);
-		buff_table->indexer.emplace_back(key, offSet);
-		data_zone->addData(kv_pair.second);
+		buff_table.filter.insert(key);
+		buff_table.indexer.emplace_back(key, offSet);
+		data_zone.addData(kv_pair.second);
 		offSet += kv_pair.second.size();
 	}
 	auto next_tag = TAG++;
-	all_buffs[tar_level][{time_stamp, next_tag}] = *buff_table;
+	all_buffs[tar_level][{time_stamp, next_tag}] = buff_table;
 
-	auto file_name = data_path + "level-" + std::to_string(tar_level) + "/" + std::to_string(time_stamp) + "_"
+	auto file_name = DATA_PATH + "level-" + std::to_string(tar_level) + "/" + std::to_string(time_stamp) + "_"
 		+ std::to_string(next_tag) + ".sst";
 	dump_info(file_name, buff_table, data_zone);
 }
-void KVStore::read_local() {
+
+void KVStore::read_meta() {
+	std::fstream f;
 	std::vector<std::string> dir_names;
-	utils::scanDir(data_path, dir_names);
+	utils::scanDir(DATA_PATH, dir_names);
 	for (const auto &dir : dir_names) {
-		std::string dir_path = data_path + dir;
+		std::string dir_path = DATA_PATH + dir;
 		std::vector<std::string> file_names;
 		utils::scanDir(dir_path, file_names);
 		for (const auto &file : file_names) {
 			const std::string file_path = dir_path + "/" + file;
 			uint64_t level, time_stamp, tag;
 			split_file_path(file_path, level, time_stamp, tag);
-			// TODO: read buff_table data from ss_table
+			buff_table_t buff_table;
+			f.open(file_path, std::ios_base::in | std::ios_base::binary);
+			uint64_t res = 0;
+			unsigned res2 = 0;
+			f.read((char *) &res, 8);
+			buff_table.time_stamp = res;
+			f.read((char *) &res, 8);
+			buff_table.kvNumber = res;
+			f.read((char *) &res, 8);
+			buff_table.sKey = res;
+			f.read((char *) &res, 8);
+			buff_table.lKey = res;
+			for (int i = 0; i < 1280; ++i) {
+				f.read((char *) &res, 8);
+				for (int j = 0; j < 64; ++j) {
+//					buff_table.filter.filter[i * 64 + 64 - j - 1] = res & 1;
+//					res = res >> 1;
+				}
+//				buff_table.filter.read_meta(res, i * 64);
+			}
+			for (uint64_t i = 0; i < buff_table.kvNumber; ++i) {
+				f.read((char *) &res, 8);
+				f.read((char *) &res2, 4);
+				buff_table.indexer.emplace_back(res, res2);
+				buff_table.filter.insert(res);
+			}
+			all_buffs[level][{time_stamp, tag}] = buff_table;
+			std::cout.flush();
+			f.close();
 		}
 	}
 }

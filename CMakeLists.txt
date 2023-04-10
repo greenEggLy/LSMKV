@@ -8,18 +8,16 @@ include_directories(include)
 
 add_executable(correctness
         correctness.cc
-        #        persistence.cc
-        kvstore.cc
-        elements/SSTable.cc
-        elements/SkipList.cc elements/BloomFilter.cc global.cpp)
+        src/kvstore.cc
+        src/SSTable.cc
+        src/SkipList.cc src/global.cc)
 add_executable(persistence
         persistence.cc
-        kvstore.cc
-        elements/SSTable.cc
-        elements/SkipList.cc elements/BloomFilter.cc global.cpp)
+        src/kvstore.cc
+        src/SSTable.cc
+        src/SkipList.cc src/global.cc)
 add_executable(main
         main.cpp
-        #        persistence.cc
-        kvstore.cc
-        elements/SSTable.cc
-        elements/SkipList.cc elements/BloomFilter.cc global.cpp)
+        src/kvstore.cc
+        src/SSTable.cc
+        src/SkipList.cc src/global.cc)

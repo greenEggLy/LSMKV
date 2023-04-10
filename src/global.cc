@@ -36,17 +36,17 @@ void split_file_path(const std::string &file_path, uint64_t &level, uint64_t &ti
 	level = std::stoull(l), time_stamp = std::stoull(t), tag = std::stoull(g);
 }
 
-void dump_info(const std::string &file_name, BuffTable *buff_table, DataZone *data_zone) {
+void dump_info(const std::string &file_name, const BuffTable &buff_table, const DataZone &data_zone) {
 	std::fstream f;
 	f.open(file_name, std::ios_base::binary | std::ios_base::out);
 
 	// write header_global_info
-	f.write((char *) &buff_table->time_stamp, 8);
-	f.write((char *) &buff_table->kvNumber, 8);
-	f.write((char *) &buff_table->sKey, 8);
-	f.write((char *) &buff_table->lKey, 8);
+	f.write((char *) &buff_table.time_stamp, 8);
+	f.write((char *) &buff_table.kvNumber, 8);
+	f.write((char *) &buff_table.sKey, 8);
+	f.write((char *) &buff_table.lKey, 8);
 	// write header_filter
-	auto filter_ = buff_table->filter;
+	auto filter_ = buff_table.filter;
 	uint64_t container = 0; // use ull to save bloom filter
 	for (int i = 0; i < FILTER_BIT_SIZE; i += 64) {
 		container = 0;
@@ -57,14 +57,38 @@ void dump_info(const std::string &file_name, BuffTable *buff_table, DataZone *da
 		// example : {0,1,1,1} => f.read((char*)&res,8) => bitset of res is 0,1,1,1,.....
 	}
 	// write indexer info
-	for (const auto &item : buff_table->indexer) {
+	for (const auto &item : buff_table.indexer) {
 		f.write((char *) &item.first, 8);
 		f.write((char *) &item.second, 4);
 	}
 	// write info content
-	for (const auto &item : data_zone->content_) {
+	for (const auto &item : data_zone.content_) {
 		f.write(item.c_str(), (long long) item.size());
 		// example: char* res = new char[size], f.read(res, size)
 	}
 	f.close();
+}
+
+void BloomFilter::insert(const uint64_t &key) {
+	unsigned int hash[4] = {0};
+	MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
+	for (unsigned int i : hash) {
+		auto h = i % FILTER_BIT_SIZE;
+		filter[h] = true;
+	}
+}
+
+bool BloomFilter::search(const uint64_t &key) const {
+	unsigned int hash[4] = {0};
+	MurmurHash3_x64_128(&key, sizeof(key), 1, hash);
+	for (auto i : hash) {
+		if (!this->filter[i % FILTER_BIT_SIZE]) return false;
+	}
+	return true;
+}
+void BloomFilter::read_meta(uint64_t meta, unsigned int offset) {
+	for (int j = 0; j < 64; ++j) {
+		filter[offset + 64 - j - 1] = meta & 1;
+		meta = meta >> 1;
+	}
 }

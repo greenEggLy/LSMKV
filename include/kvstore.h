@@ -37,27 +37,26 @@ class KVStore : public KVStoreAPI {
   SSTable *table_;
   std::map<uint64_t, std::pair<uint64_t, KVStore::MODE>> config_; // [level] = <max_file_num, mode>
 
-  static std::string read_from_file(uint64_t level,
-									uint64_t time_stamp,
-									uint64_t tag,
-									unsigned int offset,
-									unsigned int next_offset);
+  static void read_meta();
+  void read_config();
+  static std::string read_data(uint64_t level,
+							   uint64_t time_stamp,
+							   uint64_t tag,
+							   unsigned int offset,
+							   unsigned int next_offset);
+  std::string pri_get(uint64_t key, bool &deleted);
   static std::string get_util(uint64_t key,
 							  uint64_t level,
 							  uint64_t time_stamp,
 							  uint64_t tag,
 							  const buff_table_t &buff_table);
-  static bool search_index(uint64_t key, const std::vector<index_t> &indexer, unsigned int &res, unsigned int &next);
-  std::string pri_get(uint64_t key, bool &deleted);
-  void read_config();
-  void read_local();
   void create_folder(uint64_t level);
-  void dump(uint64_t tar_level, uint64_t time_stamp);
-  static void map_dump(uint64_t tar_level, uint64_t time_stamp, std::map<uint64_t, std::string> &data_map);
   void compaction(uint64_t level_x, uint64_t level_y);
+  void dump(uint64_t time_stamp);
+  static void map_dump(uint64_t tar_level, uint64_t time_stamp, const std::map<uint64_t, std::string> &data_map);
+  static bool search_index(uint64_t key, const std::vector<index_t> &indexer, unsigned int &res, unsigned int &next);
   void select_files(std::vector<std::pair<uint64_t, uint64_t>> &tar_x,
 					std::vector<std::pair<uint64_t, uint64_t>> &tar_y,
-					std::map<uint64_t, std::map<uint64_t, std::map<uint64_t, char>>> &tar,
 					uint64_t level_x,
 					uint64_t level_y,
 					uint64_t file_num);

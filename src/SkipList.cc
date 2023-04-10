@@ -84,8 +84,6 @@ bool SkipList::PUT(uint64_t key, const std::string &value, bool for_del) {
 		}
 		return true;
 	}
-	// if the key to be deleted not found, return false;
-	if (for_del && (quad_node->getKey() != key || quad_node->isGuarder()) && value == D_FLAG) return false;
 	// judge whether a new node can be inserted
 	if (willOverFlow(value, "")) return false;
 	// insert a new node, update key info
