@@ -41,7 +41,7 @@ class CorrectnessTest : public Test {
 	  }
 	  phase();
 
-//	  for (i = 0; i < max; i += 2) {
+//	  for (i = 0; i < MAX; i += 2) {
 //		  EXPECT(std::string(i + 1, 's'), store.get(i));
 //		  EXPECT(std::string(i + 2, 't'), store.get(i + 1));
 //	  }
@@ -52,11 +52,11 @@ class CorrectnessTest : public Test {
 //	  std::list<std::pair<uint64_t, std::string> > list_ans;
 //	  std::list<std::pair<uint64_t, std::string> > list_stu;
 //
-//	  for (i = 0; i < max / 2; ++i) {
+//	  for (i = 0; i < MAX / 2; ++i) {
 //		  list_ans.emplace_back(std::make_pair(i, std::string(i + 1, 's')));
 //	  }
 //
-//	  store.scan(0, max / 2 - 1, list_stu);
+//	  store.scan(0, MAX / 2 - 1, list_stu);
 //	  EXPECT(list_ans.size(), list_stu.size());
 //
 //	  auto ap = list_ans.begin();
@@ -78,10 +78,10 @@ class CorrectnessTest : public Test {
 
 	  // Test deletions
 
-//	  for (i = 0; i < max; i += 2)
+//	  for (i = 0; i < MAX; i += 2)
 //		  EXPECT(true, store.del(i));
 //
-//	  for (i = 0; i < max; ++i)
+//	  for (i = 0; i < MAX; ++i)
 //		  EXPECT((i & 1) ? std::string(i + 1, 's') : not_found,
 //				 store.get(i));
 //
@@ -95,7 +95,7 @@ class CorrectnessTest : public Test {
 		  EXPECT(not_found, store.get(i));
 	  }
 	  phase();
-//	  for (i = 0; i < max; ++i) {
+//	  for (i = 0; i < MAX; ++i) {
 //		  switch (i & 3) {
 //			  case 0: EXPECT(not_found, store.get(i));
 //				  store.put(i, std::string(i + 1, 't'));

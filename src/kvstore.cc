@@ -4,6 +4,8 @@
 KVStore::KVStore(const std::string &dir) : KVStoreAPI(dir) {
 	list_ = nullptr;
 	table_ = nullptr;
+	DATA_PATH = dir + "/";
+	PATH_PREFIX = dir + "/level-";
 	read_config();
 	read_meta();
 }
@@ -170,7 +172,7 @@ std::string KVStore::get_util(uint64_t key,
 	if (filter.search(key)) {
 		// may have, search in Indexer
 		unsigned int res, next;
-		if (search_index(key, buff_table.indexer, res, next)) { // if the key exists, read from filed
+		if (search_index(key, buff_table.indexer, res, next)) { // if the key exists, read from file
 			return read_data(level, time_stamp, tag, res, next);
 		}
 	}
@@ -190,8 +192,8 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
 	if (!utils::dirExists(dirY)) create_folder(level_y);
 
 	select_files(tar_x, tar_y, level_x, level_y, file_num);
-	// get new timestamp through tars
 
+	// get new timestamp through tars
 	for (auto tg_pair : tar_x) {
 		new_time_stamp = std::max(new_time_stamp, tg_pair.first);
 		tar_all[tg_pair.first][tg_pair.second] = level_x;
@@ -215,6 +217,7 @@ void KVStore::compaction(uint64_t level_x, uint64_t level_y) {
 	for (const auto &tg_pair : tar_y) {
 		delete_old_info(level_y, tg_pair.first, tg_pair.second);
 	}
+
 	// write to level_y
 	uint64_t off_set = HEADER_BYTE_SIZE;
 	std::map<uint64_t, std::string> tmp_map;
@@ -315,7 +318,7 @@ void KVStore::get_selected_sst(uint64_t level,
 
 void KVStore::read_config() {
 	std::fstream config;
-	config.open("../default.conf", std::ios::in);
+	config.open(CONFIG_PATH, std::ios::in);
 	std::istringstream iss;
 	uint64_t level = 0, num = 0;
 	std::string info, mode;
@@ -385,7 +388,7 @@ void KVStore::dump(uint64_t time_stamp) {
 	auto file_name = get_file_name(0, time_stamp, TAG);
 	dump_info(file_name, ss_table.buff_table_, ss_table.data_zone_);
 	all_buffs[0][{time_stamp, TAG++}] = ss_table.buff_table_;
-	// delete skip list and ss_table
+	// delete skip list
 	delete list_;
 	list_ = nullptr;
 }
@@ -393,7 +396,7 @@ void KVStore::dump(uint64_t time_stamp) {
 void KVStore::create_folder(uint64_t level) {
 	std::string dir_name = PATH_PREFIX + std::to_string(level);
 	utils::mkdir(dir_name.c_str());
-	if (config_[level].first == 0) {
+	if (config_.find(level) == config_.end()) {
 		config_[level].first = config_[level - 1].first * 2;
 		config_[level].second = MODE::LEVELING;
 	}
@@ -413,7 +416,6 @@ void KVStore::map_dump(uint64_t tar_level, uint64_t time_stamp, const std::map<u
 						 data_map.crbegin()->first,
 						 data_map.begin()->first
 	);
-//	if (buff_table.sKey <= 0 && buff_table.lKey >= 0) std::cout << "compaction: " << time_stamp << "\n";
 	DataZone data_zone;
 	auto offSet = HEADER_BYTE_SIZE + data_map.size() * 12; // update offset
 	uint64_t key = 0;
@@ -444,7 +446,7 @@ void KVStore::read_meta() {
 			const std::string file_path = dir_path + "/" + file;
 			uint64_t level, time_stamp, tag;
 			split_file_path(file_path, level, time_stamp, tag);
-			buff_table_t buff_table;
+			BuffTable buff_table;
 			f.open(file_path, std::ios_base::in | std::ios_base::binary);
 			uint64_t res = 0;
 			unsigned res2 = 0;
@@ -470,8 +472,44 @@ void KVStore::read_meta() {
 				buff_table.filter.insert(res);
 			}
 			all_buffs[level][{time_stamp, tag}] = buff_table;
-			std::cout.flush();
 			f.close();
 		}
 	}
+}
+void KVStore::read_meta(uint64_t level, uint64_t time_stamp, uint64_t tag) {
+	std::string file_path = get_file_name(level, time_stamp, tag);
+	std::fstream f(file_path, std::ios_base::in | std::ios_base::binary);
+	BuffTable buff_table;
+	uint64_t res = 0;
+	unsigned res2 = 0;
+	f.read((char *) &res, 8);
+	buff_table.time_stamp = res;
+	f.read((char *) &res, 8);
+	buff_table.kvNumber = res;
+	f.read((char *) &res, 8);
+	buff_table.sKey = res;
+	f.read((char *) &res, 8);
+	buff_table.lKey = res;
+	for (int i = 0; i < 1280; ++i) {
+		f.read((char *) &res, 8);
+		for (int j = 0; j < 64; ++j) {
+//					buff_table.filter.filter[i * 64 + 64 - j - 1] = res & 1;
+//					res = res >> 1;
+		}
+	}
+	for (uint64_t i = 0; i < buff_table.kvNumber; ++i) {
+		f.read((char *) &res, 8);
+		f.read((char *) &res2, 4);
+		buff_table.indexer.emplace_back(res, res2);
+		buff_table.filter.insert(res);
+	}
+	f.close();
+}
+
+std::string KVStore::get_file_name(uint64_t level, uint64_t time_stamp, uint64_t tag) {
+	std::string file_name = std::to_string(time_stamp) + "_" + std::to_string(tag);
+	return PATH_PREFIX + std::to_string(level) + "/" + file_name + ".sst";
+}
+std::string KVStore::get_dir_name(uint64_t level) {
+	return PATH_PREFIX + std::to_string(level) + "/";
 }

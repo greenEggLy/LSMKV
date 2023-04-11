@@ -8,14 +8,6 @@ std::map<uint64_t, std::map<std::pair<uint64_t, uint64_t>, BuffTable>>
 uint64_t TIME_STAMP = 1;
 uint64_t TAG = 0;
 
-std::string get_file_name(uint64_t level, uint64_t time_stamp, uint64_t tag) {
-	std::string file_name = std::to_string(time_stamp) + "_" + std::to_string(tag);
-	return PATH_PREFIX + std::to_string(level) + "/" + file_name + ".sst";
-}
-std::string get_dir_name(uint64_t level) {
-	return PATH_PREFIX + std::to_string(level) + "/";
-}
-
 void split_file_name(const std::string &file,
 					 uint64_t &n_time_stamp,
 					 uint64_t &n_tag) {

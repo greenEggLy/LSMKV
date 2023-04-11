@@ -13,15 +13,12 @@ struct BuffTable;
 class DataZone;
 class BloomFilter;
 
-std::string get_file_name(uint64_t level, uint64_t time_stamp, uint64_t tag);
-std::string get_dir_name(uint64_t level);
 void dump_info(const std::string &file_name, const BuffTable &buff_table, const DataZone &data_zone);
 void split_file_name(const std::string &file,
 					 uint64_t &n_time_stamp,
 					 uint64_t &n_tag);
 void split_file_path(const std::string &file_path, uint64_t &level, uint64_t &time_stamp, uint64_t &tag);
-static const std::string DATA_PATH = "../data/";
-static const std::string PATH_PREFIX = "../data/level-";
+
 static const uint32_t FILTER_BIT_SIZE = 81920;
 static const uint64_t HEADER_BYTE_SIZE = 10272;
 static const uint64_t OVERFLOW_SIZE = 2097152;
